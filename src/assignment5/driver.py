@@ -1,70 +1,43 @@
-from pyspark.sql import SparkSession
-from util import DriverUtil
+from pyspark_assignment.src.assignment5.util import *
 
-def main():
-    spark = SparkSession.builder \
-        .appName("Employee Analysis DataFrame") \
-        .getOrCreate()
+from pyspark_assignment.src.assignment4.util import *
 
-    employee_schema = "employee_id INT, employee_name STRING, department STRING, State STRING, salary INT, Age INT"
-    department_schema = "dept_id STRING, dept_name STRING"
-    country_schema = "country_code STRING, country_name STRING"
+spark = spark_session()
 
-    # Create DataFrames
-    employee_df = spark.createDataFrame([
-        (11, "james", "D101", "ny", 9000, 34),
-        (12, "michel", "D101", "ny", 8900, 32),
-        (13, "robert", "D102", "ca", 7900, 29),
-        (14, "scott", "D103", "ca", 8000, 36),
-        (15, "jen", "D102", "ny", 9500, 38),
-        (16, "jeff", "D103", "uk", 9100, 35),
-        (17, "maria", "D101", "ny", 7900, 40)
-    ], schema=employee_schema)
-    department_df = spark.createDataFrame([
-        ("D101", "sales"),
-        ("D102", "finance"),
-        ("D103", "marketing"),
-        ("D104", "hr"),
-        ("D105", "support")
-    ], schema=department_schema)
-    country_df = spark.createDataFrame([
-        ("ny", "newyork"),
-        ("ca", "California"),
-        ("uk", "Russia")
-    ], schema=country_schema)
+# Create data frames with custom schema
+employee_df = create_df(spark, employee_schema, employee_data)
+department_df = create_df(spark, department_schema, department_data)
+country_df = create_df(spark, country_schema, country_data)
 
-    # Find avg salary of each department
-    avg_salary_df = employee_df.groupBy("department").agg(avg("salary").alias("avg_salary"))
+# Find average salary of each department
+avg_salary = find_avg_salary_employee(employee_df)
+avg_salary.show()
 
-    # Find employee's name and department name whose name starts with 'm'
-    m_employees_df = employee_df.filter(col("employee_name").startswith("m")) \
-                                .join(department_df, employee_df.department == department_df.dept_id, "inner") \
-                                .select(employee_df["employee_name"], department_df["dept_name"])
+# Find employees whose name starts with 'm' and their department names
+employees_starts_with_m = find_employee_name_starts_with_m(employee_df, department_df)
+employees_starts_with_m.show()
 
-    # Create a new column in employee_df as bonus by multiplying employee salary * 2
-    employee_df = employee_df.withColumn("bonus", col("salary") * 2)
+# Create a new column in employee_df as bonus by multiplying salary * 2
+employee_bonus_df = add_bonus_times_2(employee_df)
+employee_bonus_df.show()
 
-    # Reorder the column names of employee_df
-    employee_df = employee_df.select("employee_id", "employee_name", "salary", "State", "Age", "department")
+# Reorder the columns of employee_df
+rearranged_employee_df = rearrange_columns_employee_df(employee_df)
+rearranged_employee_df.show()
 
-    # Join employee_df with department_df using inner, left, and right joins
-    inner_join_df = employee_df.join(department_df, employee_df.department == department_df.dept_id, "inner")
-    left_join_df = employee_df.join(department_df, employee_df.department == department_df.dept_id, "left")
-    right_join_df = employee_df.join(department_df, employee_df.department == department_df.dept_id, "right")
+# Perform inner join, left join, and right join dynamically
+inner_join_result = dynamic_join(employee_df, department_df, "inner")
+inner_join_result.show()
+left_join_result = dynamic_join(employee_df, department_df, "left")
+left_join_result.show()
+right_join_result = dynamic_join(employee_df, department_df, "right")
+right_join_result.show()
 
-    # Derive a new data frame with country_name instead of State in employee_df
-    employee_country_df = employee_df.join(country_df, employee_df.State == country_df.country_code, "inner") \
-                                      .drop("State") \
-                                      .withColumnRenamed("country_name", "State")
+# Derive a new data frame with country_name instead of State in employee_df
+updated_employee_df = update_country_name(employee_df)
+updated_employee_df.show()
 
-    # Convert all the column names into lowercase from the result of question 7
-    lowercase_df = employee_country_df.toDF(*(col_name.lower() for col_name in employee_country_df.columns))
-
-    # Create external tables with parquet and CSV format
-    DriverUtil.save_table_with_partition(lowercase_df, "employee.employee_details_parquet", ["State"])
-    DriverUtil.save_table_as_csv(lowercase_df, "employee.employee_details_csv")
-
-    spark.stop()
-
-if __name__ == "__main__":
-    main()
+# Convert all column names into lowercase and add load_date column with current date
+lower_case_column_df = column_to_lower(updated_employee_df)
+date_df = lower_case_column_df.withColumn("load_date", current_date())
+date_df.show()
